@@ -25,6 +25,7 @@ class ChatResponse(BaseModel):
 
 class LogRecord(BaseModel):
     ts: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     level: Literal["info", "warning", "error", "critical"]
     service: str
     event: str
@@ -38,6 +39,15 @@ class LogRecord(BaseModel):
     tokens_in: int | None = None
     tokens_out: int | None = None
     cost_usd: float | None = None
+    estimated_cost: float | None = None
+    quality_score: float | None = None
+    rag_latency_ms: float | None = None
+    llm_latency_ms: float | None = None
+    route: str | None = None
+    method: str | None = None
+    status_code: int | None = None
+    incident_state: dict[str, bool] | None = None
+    error: str | None = None
     error_type: str | None = None
     tool_name: str | None = None
     payload: dict[str, Any] | None = None

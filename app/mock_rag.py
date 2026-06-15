@@ -17,6 +17,10 @@ def retrieve(message: str) -> list[str]:
     if STATE["rag_slow"]:
         time.sleep(2.5)
     lowered = message.lower()
+    if "pii" in lowered or "app logs" in lowered or "sensitive" in lowered:
+        return CORPUS["policy"]
+    if "metrics" in lowered or "traces" in lowered or "tail latency" in lowered:
+        return CORPUS["monitoring"]
     for key, docs in CORPUS.items():
         if key in lowered:
             return docs

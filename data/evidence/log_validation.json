@@ -1,0 +1,25 @@
+{
+  "path": "data\\logs.jsonl",
+  "valid_json_lines": 155,
+  "invalid_json_lines": [],
+  "missing_required_fields": [],
+  "missing_correlation_ids": [],
+  "pii_leaks": [],
+  "events_found": [
+    "agent_completed",
+    "agent_failed",
+    "app_started",
+    "chat_completed",
+    "chat_failed",
+    "chat_started",
+    "incident_disabled",
+    "incident_enabled",
+    "llm_completed",
+    "rag_completed",
+    "request_completed",
+    "request_started"
+  ],
+  "missing_events": [],
+  "passed": true,
+  "score": 100
+}

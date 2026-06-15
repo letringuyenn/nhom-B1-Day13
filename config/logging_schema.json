@@ -1,9 +1,10 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
-  "required": ["ts", "level", "service", "event", "correlation_id"],
+  "required": ["ts", "timestamp", "level", "service", "event", "correlation_id"],
   "properties": {
     "ts": {"type": "string"},
+    "timestamp": {"type": "string"},
     "level": {"type": "string"},
     "service": {"type": "string"},
     "event": {"type": "string"},
@@ -17,6 +18,15 @@
     "tokens_in": {"type": ["integer", "null"]},
     "tokens_out": {"type": ["integer", "null"]},
     "cost_usd": {"type": ["number", "null"]},
+    "estimated_cost": {"type": ["number", "null"]},
+    "rag_latency_ms": {"type": ["number", "null"]},
+    "llm_latency_ms": {"type": ["number", "null"]},
+    "quality_score": {"type": ["number", "null"]},
+    "route": {"type": ["string", "null"]},
+    "method": {"type": ["string", "null"]},
+    "status_code": {"type": ["integer", "null"]},
+    "incident_state": {"type": ["object", "null"]},
+    "error": {"type": ["string", "null"]},
     "error_type": {"type": ["string", "null"]},
     "tool_name": {"type": ["string", "null"]},
     "payload": {"type": ["object", "null"]}

@@ -1,6 +1,11 @@
 from __future__ import annotations
 
 import os
+from contextlib import asynccontextmanager
+
+from dotenv import load_dotenv
+
+load_dotenv()
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
@@ -9,46 +14,69 @@ from structlog.contextvars import bind_contextvars
 from .agent import LabAgent
 from .incidents import disable, enable, status
 from .logging_config import configure_logging, get_logger
-from .metrics import record_error, snapshot
+from .metrics import snapshot
 from .middleware import CorrelationIdMiddleware
 from .pii import hash_user_id, summarize_text
 from .schemas import ChatRequest, ChatResponse
-from .tracing import tracing_enabled
+from .tracing import flush_traces, tracing_status
 
 configure_logging()
 log = get_logger()
-app = FastAPI(title="Day 13 Observability Lab")
-app.add_middleware(CorrelationIdMiddleware)
 agent = LabAgent()
 
 
-@app.on_event("startup")
-async def startup() -> None:
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    trace_status = tracing_status()
     log.info(
         "app_started",
         service=os.getenv("APP_NAME", "day13-observability-lab"),
         env=os.getenv("APP_ENV", "dev"),
-        payload={"tracing_enabled": tracing_enabled()},
+        tracing=trace_status,
     )
+    if not trace_status["enabled"]:
+        log.warning(
+            "tracing_disabled",
+            service="tracing",
+            reason=trace_status["reason"],
+        )
+    yield
+    flush_traces()
+
+
+app = FastAPI(title="Day 13 Observability Lab", lifespan=lifespan)
+app.add_middleware(CorrelationIdMiddleware)
 
 
 @app.get("/health")
 async def health() -> dict:
-    return {"ok": True, "tracing_enabled": tracing_enabled(), "incidents": status()}
+    return {
+        "ok": True,
+        "tracing": tracing_status(),
+        "incidents": status(),
+    }
 
 
 @app.get("/metrics")
 async def metrics() -> dict:
-    return snapshot()
+    return snapshot(status())
 
 
 @app.post("/chat", response_model=ChatResponse)
 async def chat(request: Request, body: ChatRequest) -> ChatResponse:
-    # TODO: Enrich logs with request context (user_id_hash, session_id, feature, model, env)
-    # bind_contextvars(...)
-    
+    correlation_id = request.state.correlation_id
+    incident_state = status()
+    bind_contextvars(
+        user_id_hash=hash_user_id(body.user_id),
+        session_id=body.session_id,
+        feature=body.feature,
+        model=agent.model,
+        env=os.getenv("APP_ENV", "dev"),
+        incident_state=incident_state,
+    )
+
     log.info(
-        "request_received",
+        "chat_started",
         service="api",
         payload={"message_preview": summarize_text(body.message)},
     )
@@ -58,33 +86,43 @@ async def chat(request: Request, body: ChatRequest) -> ChatResponse:
             feature=body.feature,
             session_id=body.session_id,
             message=body.message,
+            correlation_id=correlation_id,
         )
         log.info(
-            "response_sent",
+            "chat_completed",
             service="api",
+            status_code=200,
             latency_ms=result.latency_ms,
-            tokens_in=result.tokens_in,
-            tokens_out=result.tokens_out,
-            cost_usd=result.cost_usd,
+            rag_latency_ms=result.rag_latency_ms,
+            llm_latency_ms=result.llm_latency_ms,
+            input_tokens=result.tokens_in,
+            output_tokens=result.tokens_out,
+            estimated_cost=result.cost_usd,
+            quality_score=result.quality_score,
+            trace_id=result.trace_id,
             payload={"answer_preview": summarize_text(result.answer)},
         )
         return ChatResponse(
             answer=result.answer,
-            correlation_id=request.state.correlation_id,
+            correlation_id=correlation_id,
             latency_ms=result.latency_ms,
             tokens_in=result.tokens_in,
             tokens_out=result.tokens_out,
             cost_usd=result.cost_usd,
             quality_score=result.quality_score,
         )
-    except Exception as exc:  # pragma: no cover
+    except Exception as exc:
         error_type = type(exc).__name__
-        record_error(error_type)
-        log.error(
-            "request_failed",
+        log.exception(
+            "chat_failed",
             service="api",
-            error_type=error_type,
-            payload={"detail": str(exc), "message_preview": summarize_text(body.message)},
+            status_code=500,
+            error=error_type,
+            incident_state=status(),
+            payload={
+                "detail": str(exc),
+                "message_preview": summarize_text(body.message),
+            },
         )
         raise HTTPException(status_code=500, detail=error_type) from exc
 
@@ -93,8 +131,14 @@ async def chat(request: Request, body: ChatRequest) -> ChatResponse:
 async def enable_incident(name: str) -> JSONResponse:
     try:
         enable(name)
-        log.warning("incident_enabled", service="control", payload={"name": name})
-        return JSONResponse({"ok": True, "incidents": status()})
+        current_state = status()
+        log.warning(
+            "incident_enabled",
+            service="control",
+            incident=name,
+            incident_state=current_state,
+        )
+        return JSONResponse({"ok": True, "incidents": current_state})
     except KeyError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
@@ -103,7 +147,13 @@ async def enable_incident(name: str) -> JSONResponse:
 async def disable_incident(name: str) -> JSONResponse:
     try:
         disable(name)
-        log.warning("incident_disabled", service="control", payload={"name": name})
-        return JSONResponse({"ok": True, "incidents": status()})
+        current_state = status()
+        log.warning(
+            "incident_disabled",
+            service="control",
+            incident=name,
+            incident_state=current_state,
+        )
+        return JSONResponse({"ok": True, "incidents": current_state})
     except KeyError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc

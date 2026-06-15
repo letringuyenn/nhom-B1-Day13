@@ -1,40 +1,15 @@
-# Alert Rules and Runbooks
+# Alert Rules
 
-## 1. High latency P95
-- Severity: P2
-- Trigger: `latency_p95_ms > 5000 for 30m`
-- Impact: tail latency breaches SLO
-- First checks:
-  1. Open top slow traces in the last 1h
-  2. Compare RAG span vs LLM span
-  3. Check if incident toggle `rag_slow` is enabled
-- Mitigation:
-  - truncate long queries
-  - fallback retrieval source
-  - lower prompt size
+Alert definitions live in `config/alert_rules.yaml`. Operational investigation
+steps live in `docs/runbook.md`.
 
-## 2. High error rate
-- Severity: P1
-- Trigger: `error_rate_pct > 5 for 5m`
-- Impact: users receive failed responses
-- First checks:
-  1. Group logs by `error_type`
-  2. Inspect failed traces
-  3. Determine whether failures are LLM, tool, or schema related
-- Mitigation:
-  - rollback latest change
-  - disable failing tool
-  - retry with fallback model
+| Alert | Severity | Trigger | Runbook |
+|---|---|---|---|
+| `rag_latency_spike` | P2 | `max_recent_rag_latency_ms > 2000` | `docs/runbook.md#rag_slow` |
+| `high_error_rate` | P1 | `error_rate_pct > 5` | `docs/runbook.md#tool_fail` |
+| `cost_budget_spike` | P2 | `max_recent_output_tokens > 2x baseline` | `docs/runbook.md#cost_spike` |
 
-## 3. Cost budget spike
-- Severity: P2
-- Trigger: `hourly_cost_usd > 2x_baseline for 15m`
-- Impact: burn rate exceeds budget
-- First checks:
-  1. Split traces by feature and model
-  2. Compare tokens_in/tokens_out
-  3. Check if `cost_spike` incident was enabled
-- Mitigation:
-  - shorten prompts
-  - route easy requests to cheaper model
-  - apply prompt cache
+The rules are owned by the individual project maintainer. The YAML is a
+portable lab specification, not an active alerting server.
+Import equivalent expressions into Grafana, Datadog, or another monitoring
+platform for live notifications.

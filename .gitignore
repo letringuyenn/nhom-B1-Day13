@@ -6,4 +6,9 @@ data/logs.jsonl
 data/audit.jsonl
 .env
 .pytest_cache/
+.pytest-tmp/
+.pytest_tmp/
+.pytest_tmp_local/
+.tmp/
+data/pytest-verify-*/
 .antigravity/

@@ -1,19 +1,35 @@
 alerts:
-  - name: high_latency_p95
+  - name: rag_latency_spike
     severity: P2
-    condition: latency_p95_ms > 5000 for 30m
+    scenario: rag_slow
+    metric: max_recent_rag_latency_ms
+    operator: ">"
+    threshold: 2000
+    unit: ms
+    condition: max_recent_rag_latency_ms > 2000
     type: symptom-based
-    owner: team-oncall
-    runbook: docs/alerts.md#1-high-latency-p95
+    owner: individual-oncall
+    runbook: docs/runbook.md#rag_slow
   - name: high_error_rate
     severity: P1
-    condition: error_rate_pct > 5 for 5m
+    scenario: tool_fail
+    metric: error_rate_pct
+    operator: ">"
+    threshold: 5
+    unit: percent
+    condition: error_rate_pct > 5
     type: symptom-based
-    owner: team-oncall
-    runbook: docs/alerts.md#2-high-error-rate
+    owner: individual-oncall
+    runbook: docs/runbook.md#tool_fail
   - name: cost_budget_spike
     severity: P2
-    condition: hourly_cost_usd > 2x_baseline for 15m
+    scenario: cost_spike
+    metric: max_recent_output_tokens
+    operator: ">"
+    baseline_metric: average_output_tokens
+    baseline_multiplier: 2
+    unit: tokens
+    condition: max_recent_output_tokens > 2x baseline average_output_tokens
     type: symptom-based
     owner: finops-owner
-    runbook: docs/alerts.md#3-cost-budget-spike
+    runbook: docs/runbook.md#cost_spike

@@ -1,0 +1,51 @@
+{
+  "cases": 3,
+  "average_quality_score": 1.0,
+  "passed": true,
+  "results": [
+    {
+      "question": "What is your refund policy?",
+      "answer": "Refunds are available within 7 days with proof of purchase.",
+      "required_keywords": [
+        "7 days",
+        "proof of purchase"
+      ],
+      "keyword_matches": {
+        "7 days": true,
+        "proof of purchase": true
+      },
+      "score": 1.0,
+      "correlation_id": "38c0b432-934f-455f-84ed-5d296316db67"
+    },
+    {
+      "question": "Explain why metrics traces and logs work together",
+      "answer": "Metrics detect incidents, traces localize them, logs explain root cause.",
+      "required_keywords": [
+        "metrics",
+        "traces",
+        "logs"
+      ],
+      "keyword_matches": {
+        "metrics": true,
+        "traces": true,
+        "logs": true
+      },
+      "score": 1.0,
+      "correlation_id": "83e1f228-4825-4298-845e-6a1b590c8391"
+    },
+    {
+      "question": "What should not appear in app logs?",
+      "answer": "Do not expose PII in logs. Use sanitized summaries only. PII and other sensitive data must be redacted before logging.",
+      "required_keywords": [
+        "PII",
+        "sensitive"
+      ],
+      "keyword_matches": {
+        "PII": true,
+        "sensitive": true
+      },
+      "score": 1.0,
+      "correlation_id": "b2cdb1a2-bb57-4797-8a29-654715db2213"
+    }
+  ]
+}

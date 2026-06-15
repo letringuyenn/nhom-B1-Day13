@@ -1,0 +1,47 @@
+{
+  "rules_path": "config\\alert_rules.yaml",
+  "evidence_directory": "data\\evidence",
+  "alerts": [
+    {
+      "name": "rag_latency_spike",
+      "scenario": "rag_slow",
+      "severity": "P2",
+      "firing": true,
+      "metric": "max_recent_rag_latency_ms",
+      "value": 2500.0,
+      "operator": ">",
+      "threshold": 2000.0,
+      "baseline_value": null,
+      "condition": "max_recent_rag_latency_ms > 2000",
+      "runbook": "docs/runbook.md#rag_slow"
+    },
+    {
+      "name": "high_error_rate",
+      "scenario": "tool_fail",
+      "severity": "P1",
+      "firing": true,
+      "metric": "error_rate_pct",
+      "value": 5.88,
+      "operator": ">",
+      "threshold": 5.0,
+      "baseline_value": null,
+      "condition": "error_rate_pct > 5",
+      "runbook": "docs/runbook.md#tool_fail"
+    },
+    {
+      "name": "cost_budget_spike",
+      "scenario": "cost_spike",
+      "severity": "P2",
+      "firing": true,
+      "metric": "max_recent_output_tokens",
+      "value": 80.0,
+      "operator": ">",
+      "threshold": 50.2858,
+      "baseline_value": 25.1429,
+      "condition": "max_recent_output_tokens > 2x baseline average_output_tokens",
+      "runbook": "docs/runbook.md#cost_spike"
+    }
+  ],
+  "firing_count": 3,
+  "passed": true
+}

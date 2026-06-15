@@ -1,94 +1,105 @@
+from __future__ import annotations
+
+import argparse
 import json
+import re
 import sys
 from pathlib import Path
+from typing import Any
 
 LOG_PATH = Path("data/logs.jsonl")
-REQUIRED_FIELDS = {"ts", "level", "service", "event", "correlation_id"}
-ENRICHMENT_FIELDS = {"user_id_hash", "session_id", "feature", "model"}
+EVIDENCE_PATH = Path("data/evidence/log_validation.json")
+REQUIRED_FIELDS = {"ts", "timestamp", "level", "service", "event", "correlation_id"}
+REQUIRED_EVENTS = {
+    "request_started",
+    "request_completed",
+    "chat_started",
+    "agent_completed",
+    "rag_completed",
+    "llm_completed",
+}
+PII_PATTERNS = {
+    "email": re.compile(r"\b[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}\b"),
+    "credit_card": re.compile(r"\b(?:\d[ -]?){15,16}\b"),
+    "phone": re.compile(r"(?<!\d)(?:\+84|0)[ .-]?\d{3}[ .-]?\d{3}[ .-]?\d{3,4}(?!\d)"),
+}
 
-def main() -> None:
-    if not LOG_PATH.exists():
-        print(f"Error: {LOG_PATH} not found. Run the app and send some requests first.")
-        sys.exit(1)
 
-    records = []
-    for line in LOG_PATH.read_text(encoding="utf-8").splitlines():
+def validate_log_file(path: Path = LOG_PATH) -> dict[str, Any]:
+    result: dict[str, Any] = {
+        "path": str(path),
+        "valid_json_lines": 0,
+        "invalid_json_lines": [],
+        "missing_required_fields": [],
+        "missing_correlation_ids": [],
+        "pii_leaks": [],
+        "events_found": [],
+        "missing_events": [],
+        "passed": False,
+        "score": 0,
+    }
+    if not path.exists():
+        result["error"] = "log_file_not_found"
+        return result
+
+    records: list[dict[str, Any]] = []
+    for line_number, line in enumerate(
+        path.read_text(encoding="utf-8").splitlines(), start=1
+    ):
         if not line.strip():
             continue
         try:
-            records.append(json.loads(line))
+            record = json.loads(line)
         except json.JSONDecodeError:
+            result["invalid_json_lines"].append(line_number)
             continue
+        records.append(record)
+        result["valid_json_lines"] += 1
+        missing = sorted(REQUIRED_FIELDS - record.keys())
+        if missing:
+            result["missing_required_fields"].append(
+                {"line": line_number, "fields": missing}
+            )
+        if not record.get("correlation_id"):
+            result["missing_correlation_ids"].append(line_number)
+        raw = json.dumps(record, ensure_ascii=False)
+        for pii_type, pattern in PII_PATTERNS.items():
+            if pattern.search(raw):
+                result["pii_leaks"].append(
+                    {"line": line_number, "type": pii_type}
+                )
 
-    if not records:
-        print("Error: No valid JSON logs found in data/logs.jsonl")
-        sys.exit(1)
+    events = {record.get("event") for record in records}
+    result["events_found"] = sorted(event for event in events if event)
+    result["missing_events"] = sorted(REQUIRED_EVENTS - events)
+    checks = [
+        not result["invalid_json_lines"],
+        not result["missing_required_fields"],
+        not result["missing_correlation_ids"],
+        not result["pii_leaks"],
+        not result["missing_events"],
+        len({record.get("correlation_id") for record in records}) >= 2,
+    ]
+    result["score"] = round(sum(checks) / len(checks) * 100)
+    result["passed"] = all(checks)
+    return result
 
-    total = len(records)
-    missing_required = 0
-    missing_enrichment = 0
-    pii_hits = []
-    correlation_ids = set()
 
-    for rec in records:
-        # Check required fields (global)
-        if not {"ts", "level", "event"}.issubset(rec.keys()):
-            missing_required += 1
-            
-        # Context-specific checks for API requests
-        if rec.get("service") == "api":
-            if "correlation_id" not in rec or rec.get("correlation_id") == "MISSING":
-                missing_required += 1
-            
-            if not ENRICHMENT_FIELDS.issubset(rec.keys()):
-                missing_enrichment += 1
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--log-path", type=Path, default=LOG_PATH)
+    parser.add_argument("--evidence-path", type=Path, default=EVIDENCE_PATH)
+    args = parser.parse_args()
 
-        # Check PII (naive check for @ or common test credit card)
-        raw = json.dumps(rec)
-        if "@" in raw or "4111" in raw:
-            pii_hits.append(rec.get("event", "unknown"))
+    result = validate_log_file(args.log_path)
+    args.evidence_path.parent.mkdir(parents=True, exist_ok=True)
+    args.evidence_path.write_text(
+        json.dumps(result, indent=2, ensure_ascii=False),
+        encoding="utf-8",
+    )
+    print(json.dumps(result, indent=2, ensure_ascii=False))
+    sys.exit(0 if result["passed"] else 1)
 
-        # Collect correlation IDs
-        cid = rec.get("correlation_id")
-        if cid and cid != "MISSING":
-            correlation_ids.add(cid)
-
-    print("--- Lab Verification Results ---")
-    print(f"Total log records analyzed: {total}")
-    print(f"Records with missing required fields: {missing_required}")
-    print(f"Records with missing enrichment (context): {missing_enrichment}")
-    print(f"Unique correlation IDs found: {len(correlation_ids)}")
-    print(f"Potential PII leaks detected: {len(pii_hits)}")
-    if pii_hits:
-        print(f"  Events with leaks: {set(pii_hits)}")
-    
-    print("\n--- Grading Scorecard (Estimates) ---")
-    score = 100
-    if missing_required > 0:
-        score -= 30
-        print("- [FAILED] Missing required fields (ts, level, etc.)")
-    else:
-        print("+ [PASSED] Basic JSON schema")
-
-    if len(correlation_ids) < 2:
-        score -= 20
-        print("- [FAILED] Correlation ID propagation (less than 2 unique IDs)")
-    else:
-        print("+ [PASSED] Correlation ID propagation")
-
-    if missing_enrichment > 0:
-        score -= 20
-        print("- [FAILED] Log enrichment (missing user_id_hash, etc.)")
-    else:
-        print("+ [PASSED] Log enrichment")
-
-    if pii_hits:
-        score -= 30
-        print("- [FAILED] PII scrubbing (found @ or test credit card)")
-    else:
-        print("+ [PASSED] PII scrubbing")
-
-    print(f"\nEstimated Score: {max(0, score)}/100")
 
 if __name__ == "__main__":
     main()
