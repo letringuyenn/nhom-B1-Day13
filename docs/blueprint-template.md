@@ -89,12 +89,12 @@ Only a SHA-256-derived `user_id_hash` is bound to logs and traces.
 
 ## 6. Metrics, SLO, and Dashboard
 
-| SLI | Target | Current evidence |
-|---|---:|---:|
-| Request P95 | < 3000 ms | Baseline 164.35 ms |
-| Error rate | < 2% | Baseline 0%; `tool_fail` 5.88% |
-| Cost budget | < USD 2.50/day | Baseline total USD 0.006723 |
-| Average quality | >= 0.75 | Runtime 0.8357; keyword eval 1.0 |
+| SLI             |         Target |                 Current evidence |
+| --------------- | -------------: | -------------------------------: |
+| Request P95     |      < 3000 ms |               Baseline 164.35 ms |
+| Error rate      |           < 2% |   Baseline 0%; `tool_fail` 5.88% |
+| Cost budget     | < USD 2.50/day |      Baseline total USD 0.006723 |
+| Average quality |        >= 0.75 | Runtime 0.8357; keyword eval 1.0 |
 
 Required metric panels:
 
@@ -108,7 +108,7 @@ Required metric panels:
 - [DASHBOARD_6_PANELS_SCREENSHOT]: docs/SCREENSHOT/dashboard_panels.png
 - Interactive local report: `docs/dashboard.html`
 
-![Observability report cover](SCREENSHOT/dashboard.png)
+![Observability report cover]
 
 ![Six metric panels](SCREENSHOT/dashboard_panels.png)
 
@@ -189,11 +189,11 @@ The alert engine is `scripts/check_alerts.py`; its output is stored in
 
 ## 9. Alert Rules
 
-| Alert | Scenario | Trigger | Result |
-|---|---|---|---|
-| `rag_latency_spike` | `rag_slow` | max recent RAG latency > 2000 ms | FIRING |
-| `high_error_rate` | `tool_fail` | error rate > 5% | FIRING |
-| `cost_budget_spike` | `cost_spike` | max output tokens > 2x baseline | FIRING |
+| Alert               | Scenario     | Trigger                          | Result |
+| ------------------- | ------------ | -------------------------------- | ------ |
+| `rag_latency_spike` | `rag_slow`   | max recent RAG latency > 2000 ms | FIRING |
+| `high_error_rate`   | `tool_fail`  | error rate > 5%                  | FIRING |
+| `cost_budget_spike` | `cost_spike` | max output tokens > 2x baseline  | FIRING |
 
 Rules: `config/alert_rules.yaml`
 
